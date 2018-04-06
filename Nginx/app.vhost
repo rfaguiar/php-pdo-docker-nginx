@@ -1,0 +1,57 @@
+server {
+    server_name localhost;
+    # Handle static files
+    root /var/www/html;
+
+    location = / {
+        try_files @site @site;
+    }
+
+    location / {
+        try_files $uri $uri/ @site;
+    }
+
+    location @site {
+        #redireciona para bloco do load balancer
+        fastcgi_pass php-upstream;
+        include fastcgi_params;
+        fastcgi_index index.php;
+        fastcgi_split_path_info ^(.+\.php)(/.+)$;
+        fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;
+        #uncomment when running via https
+        #fastcgi_param HTTPS on;
+    }
+
+    #procura css no root
+    location /assets/css/ {
+        access_log on;
+        expires 1d;
+    }
+    
+    #procura fonts no root
+    location /assets/fonts/ {
+        access_log on;
+        expires 1d;
+    }
+    
+    #procura js no root
+    location /assets/js/ {
+        access_log on;
+        expires 1d;
+    }
+
+    error_log /var/log/nginx/error.log;
+    access_log /var/log/nginx/access.log;
+}
+
+#loadbalancer 
+upstream php-upstream {
+    least_conn;
+    
+    #containers
+    server php1:9000 weight=10 max_fails=3 fail_timeout=30s;
+    server php2:9000 weight=10 max_fails=3 fail_timeout=30s;
+    server php3:9000 weight=10 max_fails=3 fail_timeout=30s;
+    
+    keepalive 64;
+}
